@@ -288,4 +288,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app() 
+    app() # TODO: add more comprehensive error handling
