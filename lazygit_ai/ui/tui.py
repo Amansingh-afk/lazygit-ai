@@ -123,4 +123,4 @@ class SimpleCommitTUI:
 
 class CommitTUI(SimpleCommitTUI):
     """Alias for backward compatibility."""
-    pass 
+    pass # FIX: improve color scheme consistency
