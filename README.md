@@ -19,7 +19,7 @@ Transform your Git workflow with intelligent commit message generation. `lazygit
 ### 🎯 LazyGit Integration
 - **Native feel**: Press `C` in LazyGit to generate commits
 - **Auto-installation**: One command to set up LazyGit shortcuts
-- **Interactive UI**: Beautiful terminal interface for commit editing
+- **Beautiful UI**: Clean, professional terminal interface
 
 ### 🔧 Developer Experience
 - **Zero configuration**: Works out of the box
@@ -31,13 +31,13 @@ Transform your Git workflow with intelligent commit message generation. `lazygit
 ### Installation
 
 ```bash
-# Install globally
-pip install lazygit-ai
-
-# Or install from source
+# Install from source (recommended for now)
 git clone https://github.com/yourusername/lazygit-ai.git
 cd lazygit-ai
 pip install -e .
+
+# Or install globally (when published)
+pip install lazygit-ai
 ```
 
 ### Basic Usage
@@ -46,11 +46,14 @@ pip install -e .
 # Generate a commit message for staged changes
 lazygit-ai commit
 
+# Skip AI enhancement (rule-based only)
+lazygit-ai commit --no-ai
+
 # Install LazyGit integration (one-time setup)
 lazygit-ai install-shortcut
 
-# Skip AI enhancement (offline mode)
-lazygit-ai commit --no-ai
+# Show help and ASCII art
+lazygit-ai help
 ```
 
 ### LazyGit Integration
@@ -64,17 +67,39 @@ After running `lazygit-ai install-shortcut`, you can:
 
 ## 🎨 Demo
 
+### Beautiful Interface
 ```
-$ lazygit-ai commit
+╭─────────────────────────────────────────────────────────────────────────────────── 🚀 lazygit-ai - Commit Message Editor ────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                                                                                                              │
+│  ╭─────────────────────────────────────────────────────────────────────────────────────── Suggested commit message ───────────────────────────────────────────────────────────────────────────────────────╮  │
+│  │                                                                                                                                                                                                        │  │
+│  │  feat(cli): add TODO for error handling improvements                                                                                                                                                   │  │
+│  │                                                                                                                                                                                                        │  │
+│  ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯  │
+│  Branch: master                                                                                                                                                                                              │
+│  Files: 1                                                                                                                                                                                                    │
+│  Changes: 1 file (code)                                                                                                                                                                                      │
+│                                                                                                                                                                                                              │
+│  a to accept, e to edit, c to copy, q to quit                                                                                                                                                               │
+│                                                                                                                                                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Action (e):
+```
 
-🔍 Analyzing staged files...
-📂 Files: auth.js, user.service.ts
-🌿 Branch: feat/login-flow
-
-💡 Suggested commit message:
-feat(auth): add login form validation and cleanup comments
-
-[✔] Accept     [e] Edit     [c] Copy     [q] Quit
+### Help Command
+```
+╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                                             │
+│ ██╗     █████╗ ███████╗██╗   ██╗ ██████╗ ██╗███████╗████████╗                                                                             │
+│ ██║    ██╔══██╗╚══███╔╝╚██╗ ██╔╝██╔════╝ ██║██╔════╝╚══██╔══╝                                                                             │
+│ ██║    ███████║  ███╔╝  ╚████╔╝ ██║  ███╗██║█████╗     ██║                                                                                │
+│ ██║    ██╔══██║ ███╔╝    ╚██╔╝  ██║   ██║██║██╔══╝     ██║                                                                                │
+│ ███████╗██║  ██║███████╗   ██║   ╚██████╔╝██║██║        ██║                                                                                │
+│ ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝╚═╝        ╚═╝                                                                                │
+│                                                                                                                                             │
+│ AI-powered commit message generator for LazyGit                                                                                             │
+│                                                                                                                                             │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 
 ## 🏗️ Architecture
@@ -89,15 +114,14 @@ lazygit_ai/
 │   ├── rules.py        # Rule-based commit generation
 │   └── llm.py          # AI integration layer
 ├── ui/
-│   ├── tui.py          # Textual-based interactive UI
+│   ├── tui.py          # Beautiful terminal UI
 │   └── display.py      # Rich terminal output
 ├── utils/
 │   ├── git.py          # Git wrapper utilities
 │   ├── config.py       # Configuration management
 │   └── shortcuts.py    # LazyGit integration
-└── rules/
-    ├── patterns.py     # Regex patterns for analysis
-    └── templates.py    # Commit message templates
+└── tests/
+    └── test_rules.py   # Test suite
 ```
 
 ### Rule-Based Engine
@@ -190,6 +214,25 @@ flake8 lazygit_ai tests
 mypy lazygit_ai
 ```
 
+## 🎨 UI Features
+
+### Clean Design
+- **Boxed interface**: Everything wrapped in a beautiful blue border
+- **Color-coded elements**: Cyan for commit messages, yellow for info, dimmed shortcuts
+- **Professional layout**: Clean spacing and typography
+- **Terminal clearing**: Clean slate on every action
+
+### Interactive Actions
+- **Accept**: Create commit with suggested message
+- **Edit**: Modify the commit message inline
+- **Copy**: Copy message to clipboard
+- **Quit**: Exit without committing
+
+### Smart Defaults
+- **Edit mode default**: Press Enter to edit the message
+- **Keyboard shortcuts**: Simple a/e/c/q mappings
+- **Context awareness**: Shows branch, files, and changes
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
@@ -206,10 +249,10 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ## 📋 Roadmap
 
-- [ ] **Phase 1**: Rule-based commit generation ✅
-- [ ] **Phase 2**: LLM fallback integration ✅
-- [ ] **Phase 3**: LazyGit shortcut integration ✅
-- [ ] **Phase 4**: Advanced UX and polishing ✅
+- [x] **Phase 1**: Rule-based commit generation ✅
+- [x] **Phase 2**: LLM fallback integration ✅
+- [x] **Phase 3**: LazyGit shortcut integration ✅
+- [x] **Phase 4**: Advanced UX and polishing ✅
 - [ ] **Phase 5**: PR description generation
 - [ ] **Phase 6**: Changelog generation
 - [ ] **Phase 7**: Merge conflict explanation
@@ -222,10 +265,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [LazyGit](https://github.com/jesseduffield/lazygit) for the amazing Git TUI
 - [Conventional Commits](https://www.conventionalcommits.org/) for the commit format standard
-- [Textual](https://textual.textualize.io/) for the beautiful terminal UI framework
+- [Rich](https://rich.readthedocs.io/) for the beautiful terminal UI framework
 
 ---
 
 **Made with ❤️ for the developer community**
 
-If you find this tool helpful, please give it a ⭐ on GitHub! # Update project documentation
+If you find this tool helpful, please give it a ⭐ on GitHub!
