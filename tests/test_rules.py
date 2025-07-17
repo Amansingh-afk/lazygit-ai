@@ -243,4 +243,4 @@ class TestRuleEngine:
         
         message = self.engine.generate_message(analysis)
         assert not message.startswith("feat(")
-        assert "add login" in message # Add more comprehensive test coverage
+        assert "add login" in message 

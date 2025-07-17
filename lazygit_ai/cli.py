@@ -86,8 +86,7 @@ def commit(
             console.print("  [code]git add .[/code] (stage all changes)")
             raise typer.Exit(1)
         
-        # Show banner and analysis
-        show_banner()
+        # Show analysis start
         display.show_analysis_start(staged_files)
         
         # Analyze git state
@@ -113,17 +112,16 @@ def commit(
         if message:
             final_message = message
         
-        # Display results
-        display.show_commit_message(final_message, analysis)
-        
         # Handle different output modes
         if copy_only:
+            display.show_commit_message(final_message, analysis)
             display.copy_to_clipboard(final_message)
             console.print("[green]✅ Commit message copied to clipboard![/green]")
         elif dry_run:
+            display.show_commit_message(final_message, analysis)
             display.show_dry_run(final_message, staged_files)
         else:
-            # Launch interactive TUI
+            # Launch interactive TUI (no need to display message first)
             tui = CommitTUI(final_message, analysis, git_wrapper)
             tui.run()
             
@@ -133,6 +131,50 @@ def commit(
         else:
             console.print(f"[red]❌ Error: {str(e)}[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def help() -> None:
+    """Show detailed help and information about lazygit-ai."""
+    show_banner()
+    
+    help_text = """
+[bold]🚀 lazygit-ai: AI-powered commit message generator for LazyGit[/bold]
+
+[bold]Commands:[/bold]
+  [cyan]lazygit-ai commit[/cyan]          - Generate commit message for staged changes
+  [cyan]lazygit-ai install-shortcut[/cyan] - Install LazyGit integration
+  [cyan]lazygit-ai config[/cyan]          - Manage configuration
+  [cyan]lazygit-ai help[/cyan]            - Show this help
+
+[bold]Commit Options:[/bold]
+  [yellow]--no-ai[/yellow]                    - Skip AI enhancement (rule-based only)
+  [yellow]--copy[/yellow]                     - Copy to clipboard only
+  [yellow]--dry-run[/yellow]                  - Show what would be committed
+  [yellow]--verbose[/yellow]                  - Show detailed output
+  [yellow]--message[/yellow]                  - Use custom commit message
+
+[bold]LazyGit Integration:[/bold]
+  1. Install shortcut: [code]lazygit-ai install-shortcut[/code]
+  2. In LazyGit, press [code]C[/code] in Files context
+  3. Review and edit the generated message
+  4. Accept to commit or copy to clipboard
+
+[bold]Configuration:[/bold]
+  Config file: [code]~/.config/lazygit-ai/config.toml[/code]
+  Edit config: [code]lazygit-ai config --edit[/code]
+  Show config: [code]lazygit-ai config --show[/code]
+
+[bold]Examples:[/bold]
+  [code]lazygit-ai commit[/code]              - Generate AI-enhanced commit message
+  [code]lazygit-ai commit --no-ai[/code]      - Rule-based commit message only
+  [code]lazygit-ai commit --copy[/code]       - Copy message to clipboard
+  [code]lazygit-ai commit --dry-run[/code]    - Preview without committing
+
+[dim]For more information, visit:[/dim]
+[link=https://github.com/yourusername/lazygit-ai]https://github.com/yourusername/lazygit-ai[/link]
+"""
+    console.print(help_text)
 
 
 @app.command()
@@ -288,4 +330,4 @@ def main(
 
 
 if __name__ == "__main__":
-    app() # TODO: add more comprehensive error handling
+    app() 

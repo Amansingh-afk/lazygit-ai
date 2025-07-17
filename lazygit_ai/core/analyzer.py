@@ -332,4 +332,4 @@ class GitAnalyzer:
             "fixes": len(analysis.fixes),
             "bugs": len(analysis.bugs),
             "scope_suggestions": analysis.scope_suggestions[:3],  # Top 3 suggestions
-        } # BUG: handle edge case when no staged files
+        } 
