@@ -228,4 +228,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ for the developer community**
 
-If you find this tool helpful, please give it a ⭐ on GitHub! 
+If you find this tool helpful, please give it a ⭐ on GitHub! # Update project documentation
