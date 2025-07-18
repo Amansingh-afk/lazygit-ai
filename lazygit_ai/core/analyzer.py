@@ -8,9 +8,16 @@ to provide comprehensive context for commit message generation.
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 
 from ..utils.git import GitWrapper
+
+
+# Configuration constants for large file handling
+MAX_DIFF_SIZE = 1024 * 1024  # 1MB limit for diff processing
+MAX_DIFF_LINES = 10000  # 10k lines limit
+MAX_PATTERN_MATCHES = 100  # Limit pattern matches per diff
+CHUNK_SIZE = 8192  # 8KB chunks for streaming
 
 
 @dataclass
@@ -58,7 +65,7 @@ class GitAnalysis:
     scope_suggestions: List[str]
     
     # Enhanced context
-    change_context: Dict[str, any]
+    change_context: Dict[str, Any]
     impact_level: str  # low, medium, high
 
 
@@ -80,19 +87,19 @@ class GitAnalyzer:
         file_types = self.git.get_file_types(staged_files)
         file_extensions = self.git.get_file_extensions(staged_files)
         
-        # Get diffs
-        staged_diff = self.git.get_staged_diff()
-        unstaged_diff = self.git.get_unstaged_diff()
+        # Get diffs with size limits
+        staged_diff = self._get_staged_diff_with_limits()
+        unstaged_diff = self._get_unstaged_diff_with_limits()
         
         # Get statistics
         stats = self.git.get_commit_stats()
         
-        # Analyze patterns in diffs
+        # Analyze patterns in diffs (with limits)
         todos = self._extract_todos(staged_diff)
         fixes = self._extract_fixes(staged_diff)
         bugs = self._extract_bugs(staged_diff)
         
-        # Enhanced pattern extraction
+        # Enhanced pattern extraction (with limits)
         version_changes = self._extract_version_changes(staged_diff)
         function_changes = self._extract_function_changes(staged_diff)
         color_changes = self._extract_color_changes(staged_diff)
@@ -141,6 +148,90 @@ class GitAnalyzer:
             impact_level=impact_level,
         )
     
+    def _get_staged_diff_with_limits(self) -> str:
+        """Get staged diff with size and line limits."""
+        try:
+            import subprocess
+            
+            # First, check the size of the diff
+            size_result = subprocess.run(
+                ["git", "diff", "--cached", "--stat"],
+                capture_output=True,
+                text=True,
+                cwd=self.git.repo_path,
+                check=True,
+            )
+            
+            # If diff is too large, get a truncated version
+            if len(size_result.stdout) > MAX_DIFF_SIZE:
+                # Get only the first part of the diff
+                result = subprocess.run(
+                    ["git", "diff", "--cached", "--no-color"],
+                    capture_output=True,
+                    text=True,
+                    cwd=self.git.repo_path,
+                    check=True,
+                )
+                
+                diff_content = result.stdout
+                lines = diff_content.split('\n')
+                
+                if len(lines) > MAX_DIFF_LINES:
+                    # Truncate to MAX_DIFF_LINES and add truncation notice
+                    truncated_lines = lines[:MAX_DIFF_LINES]
+                    truncated_lines.append(f"\n... (diff truncated at {MAX_DIFF_LINES} lines)")
+                    return '\n'.join(truncated_lines)
+                
+                return diff_content
+            else:
+                # Normal diff processing
+                return self.git.get_staged_diff()
+                
+        except subprocess.CalledProcessError:
+            return ""
+    
+    def _get_unstaged_diff_with_limits(self) -> str:
+        """Get unstaged diff with size and line limits."""
+        try:
+            import subprocess
+            
+            # First, check the size of the diff
+            size_result = subprocess.run(
+                ["git", "diff", "--stat"],
+                capture_output=True,
+                text=True,
+                cwd=self.git.repo_path,
+                check=True,
+            )
+            
+            # If diff is too large, get a truncated version
+            if len(size_result.stdout) > MAX_DIFF_SIZE:
+                # Get only the first part of the diff
+                result = subprocess.run(
+                    ["git", "diff", "--no-color"],
+                    capture_output=True,
+                    text=True,
+                    cwd=self.git.repo_path,
+                    check=True,
+                )
+                
+                diff_content = result.stdout
+                lines = diff_content.split('\n')
+                
+                if len(lines) > MAX_DIFF_LINES:
+                    # Truncate to MAX_DIFF_LINES and add truncation notice
+                    truncated_lines = lines[:MAX_DIFF_LINES]
+                    truncated_lines.append(f"\n... (diff truncated at {MAX_DIFF_LINES} lines)")
+                    return '\n'.join(truncated_lines)
+                
+                return diff_content
+            else:
+                # Normal diff processing
+                return self.git.get_unstaged_diff()
+                
+        except subprocess.CalledProcessError:
+            return ""
+    
     def _get_unstaged_files(self) -> List[str]:
         """Get list of unstaged files."""
         try:
@@ -164,7 +255,10 @@ class GitAnalyzer:
             return []
     
     def _extract_todos(self, diff: str) -> List[str]:
-        """Extract TODO comments from diff."""
+        """Extract TODO comments from diff with limits."""
+        if not diff or len(diff) > MAX_DIFF_SIZE:
+            return []
+        
         todos = []
         patterns = [
             r"//\s*TODO[:\s]*(.+)",
@@ -176,12 +270,21 @@ class GitAnalyzer:
         
         for pattern in patterns:
             matches = re.findall(pattern, diff, re.IGNORECASE | re.MULTILINE)
-            todos.extend([match.strip() for match in matches])
+            # Limit the number of matches to prevent memory issues
+            limited_matches = matches[:MAX_PATTERN_MATCHES]
+            todos.extend([match.strip() for match in limited_matches])
+            
+            # Stop if we've reached the limit
+            if len(todos) >= MAX_PATTERN_MATCHES:
+                break
         
-        return todos
+        return todos[:MAX_PATTERN_MATCHES]
     
     def _extract_fixes(self, diff: str) -> List[str]:
-        """Extract FIX comments from diff."""
+        """Extract FIX comments from diff with limits."""
+        if not diff or len(diff) > MAX_DIFF_SIZE:
+            return []
+        
         fixes = []
         patterns = [
             r"//\s*FIX[:\s]*(.+)",
@@ -193,12 +296,20 @@ class GitAnalyzer:
         
         for pattern in patterns:
             matches = re.findall(pattern, diff, re.IGNORECASE | re.MULTILINE)
-            fixes.extend([match.strip() for match in matches])
+            # Limit the number of matches
+            limited_matches = matches[:MAX_PATTERN_MATCHES]
+            fixes.extend([match.strip() for match in limited_matches])
+            
+            if len(fixes) >= MAX_PATTERN_MATCHES:
+                break
         
-        return fixes
+        return fixes[:MAX_PATTERN_MATCHES]
     
     def _extract_bugs(self, diff: str) -> List[str]:
-        """Extract BUG comments from diff."""
+        """Extract BUG comments from diff with limits."""
+        if not diff or len(diff) > MAX_DIFF_SIZE:
+            return []
+        
         bugs = []
         patterns = [
             r"//\s*BUG[:\s]*(.+)",
@@ -210,12 +321,20 @@ class GitAnalyzer:
         
         for pattern in patterns:
             matches = re.findall(pattern, diff, re.IGNORECASE | re.MULTILINE)
-            bugs.extend([match.strip() for match in matches])
+            # Limit the number of matches
+            limited_matches = matches[:MAX_PATTERN_MATCHES]
+            bugs.extend([match.strip() for match in limited_matches])
+            
+            if len(bugs) >= MAX_PATTERN_MATCHES:
+                break
         
-        return bugs
+        return bugs[:MAX_PATTERN_MATCHES]
     
     def _extract_version_changes(self, diff: str) -> List[str]:
-        """Extract version changes from diff."""
+        """Extract version changes from diff with limits."""
+        if not diff or len(diff) > MAX_DIFF_SIZE:
+            return []
+        
         version_changes = []
         patterns = [
             r'version\s*[=:]\s*["\']?(\d+\.\d+\.\d+)["\']?',
@@ -227,12 +346,20 @@ class GitAnalyzer:
         
         for pattern in patterns:
             matches = re.findall(pattern, diff, re.IGNORECASE | re.MULTILINE)
-            version_changes.extend(matches)
+            # Limit the number of matches
+            limited_matches = matches[:MAX_PATTERN_MATCHES]
+            version_changes.extend(limited_matches)
+            
+            if len(version_changes) >= MAX_PATTERN_MATCHES:
+                break
         
-        return version_changes
+        return version_changes[:MAX_PATTERN_MATCHES]
     
     def _extract_function_changes(self, diff: str) -> List[str]:
-        """Extract function and method changes from diff."""
+        """Extract function and method changes from diff with limits."""
+        if not diff or len(diff) > MAX_DIFF_SIZE:
+            return []
+        
         function_changes = []
         patterns = [
             r'def\s+(\w+)',  # Python
@@ -246,12 +373,20 @@ class GitAnalyzer:
         
         for pattern in patterns:
             matches = re.findall(pattern, diff, re.MULTILINE)
-            function_changes.extend(matches)
+            # Limit the number of matches
+            limited_matches = matches[:MAX_PATTERN_MATCHES]
+            function_changes.extend(limited_matches)
+            
+            if len(function_changes) >= MAX_PATTERN_MATCHES:
+                break
         
-        return function_changes
+        return function_changes[:MAX_PATTERN_MATCHES]
     
     def _extract_color_changes(self, diff: str) -> List[str]:
-        """Extract color-related changes from diff."""
+        """Extract color-related changes from diff with limits."""
+        if not diff or len(diff) > MAX_DIFF_SIZE:
+            return []
+        
         color_changes = []
         patterns = [
             r'color\s*[=:]\s*["\']?([^"\']+)["\']?',
@@ -266,12 +401,20 @@ class GitAnalyzer:
         
         for pattern in patterns:
             matches = re.findall(pattern, diff, re.IGNORECASE | re.MULTILINE)
-            color_changes.extend(matches)
+            # Limit the number of matches
+            limited_matches = matches[:MAX_PATTERN_MATCHES]
+            color_changes.extend(limited_matches)
+            
+            if len(color_changes) >= MAX_PATTERN_MATCHES:
+                break
         
-        return color_changes
+        return color_changes[:MAX_PATTERN_MATCHES]
     
     def _extract_config_changes(self, diff: str) -> List[str]:
-        """Extract configuration changes from diff."""
+        """Extract configuration changes from diff with limits."""
+        if not diff or len(diff) > MAX_DIFF_SIZE:
+            return []
+        
         config_changes = []
         patterns = [
             r'config\s*[=:]\s*["\']?([^"\']+)["\']?',
@@ -283,9 +426,14 @@ class GitAnalyzer:
         
         for pattern in patterns:
             matches = re.findall(pattern, diff, re.IGNORECASE | re.MULTILINE)
-            config_changes.extend(matches)
+            # Limit the number of matches
+            limited_matches = matches[:MAX_PATTERN_MATCHES]
+            config_changes.extend(limited_matches)
+            
+            if len(config_changes) >= MAX_PATTERN_MATCHES:
+                break
         
-        return config_changes
+        return config_changes[:MAX_PATTERN_MATCHES]
     
     def _analyze_branch(self, branch_name: str) -> tuple[Optional[str], Optional[str]]:
         """Analyze branch name for type and scope."""
@@ -429,7 +577,7 @@ class GitAnalyzer:
         
         return sorted(list(suggestions))
     
-    def _analyze_change_context(self, staged_files: List[str], stats: Dict[str, int], file_types: Dict[str, List[str]], staged_diff: str) -> Dict[str, any]:
+    def _analyze_change_context(self, staged_files: List[str], stats: Dict[str, int], file_types: Dict[str, List[str]], staged_diff: str) -> Dict[str, Any]:
         """Analyze the context and nature of changes."""
         context = {
             "is_documentation_update": bool(file_types.get("docs")),
@@ -532,7 +680,7 @@ class GitAnalyzer:
         # Low impact
         return "low"
     
-    def get_analysis_summary(self, analysis: GitAnalysis) -> Dict[str, any]:
+    def get_analysis_summary(self, analysis: GitAnalysis) -> Dict[str, Any]:
         """Get a summary of the analysis for display."""
         return {
             "branch": analysis.branch_name,

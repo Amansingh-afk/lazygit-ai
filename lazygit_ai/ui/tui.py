@@ -11,7 +11,7 @@ import threading
 import time
 import tty
 import termios
-from typing import Optional
+from typing import Optional, Callable
 
 from rich.console import Console, Group
 from rich.text import Text
@@ -166,6 +166,140 @@ class InPlaceEditor:
         return self.text
 
 
+class UnifiedKeyboardHandler:
+    """Unified keyboard input handler that works across platforms."""
+    
+    def __init__(self, valid_keys: set[str] = None):
+        """Initialize keyboard handler with valid keys."""
+        self.valid_keys = valid_keys or {'a', 'c', 'q'}
+        self.running = True
+        self._listener_thread = None
+    
+    def start_listening(self, callback: Callable[[str], None]) -> None:
+        """Start listening for keyboard input."""
+        if not sys.stdin.isatty() or 'pytest' in sys.modules:
+            self._start_fallback_listener(callback)
+            return
+        
+        # Try the best method first, fall back to alternatives
+        if self._try_keyboard_library(callback):
+            return
+        elif self._try_platform_specific(callback):
+            return
+        else:
+            self._start_fallback_listener(callback)
+    
+    def _try_keyboard_library(self, callback: Callable[[str], None]) -> bool:
+        """Try using the keyboard library."""
+        try:
+            import keyboard
+            
+            def on_key_press(event):
+                if not self.running:
+                    return
+                if event.name in self.valid_keys:
+                    callback(event.name)
+            
+            keyboard.on_press(on_key_press)
+            
+            self._listener_thread = threading.Thread(
+                target=self._keyboard_library_loop, 
+                daemon=True
+            )
+            self._listener_thread.start()
+            return True
+            
+        except (ImportError, PermissionError, OSError):
+            return False
+    
+    def _keyboard_library_loop(self) -> None:
+        """Main loop for keyboard library listener."""
+        try:
+            while self.running:
+                time.sleep(0.1)
+        except Exception:
+            pass
+    
+    def _try_platform_specific(self, callback: Callable[[str], None]) -> bool:
+        """Try platform-specific keyboard input."""
+        try:
+            self._listener_thread = threading.Thread(
+                target=self._platform_specific_loop, 
+                args=(callback,),
+                daemon=True
+            )
+            self._listener_thread.start()
+            return True
+        except Exception:
+            return False
+    
+    def _platform_specific_loop(self, callback: Callable[[str], None]) -> None:
+        """Platform-specific keyboard input loop."""
+        try:
+            while self.running:
+                key = self._get_single_key()
+                if key and key in self.valid_keys:
+                    callback(key)
+                time.sleep(0.01)
+        except Exception:
+            pass
+    
+    def _get_single_key(self) -> Optional[str]:
+        """Get a single key press without requiring Enter."""
+        try:
+            if os.name == 'nt':  # Windows
+                import msvcrt
+                key = msvcrt.getch().decode('utf-8').lower()
+                return key if key in self.valid_keys else None
+            else:  # Unix-like systems
+                try:
+                    import tty
+                    import termios
+                except ImportError:
+                    return None
+                
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+                try:
+                    tty.setraw(sys.stdin.fileno())
+                    ch = sys.stdin.read(1).lower()
+                    return ch if ch in self.valid_keys else None
+                finally:
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        except Exception:
+            return None
+    
+    def _start_fallback_listener(self, callback: Callable[[str], None]) -> None:
+        """Start fallback listener using traditional input."""
+        self._listener_thread = threading.Thread(
+            target=self._fallback_loop, 
+            args=(callback,),
+            daemon=True
+        )
+        self._listener_thread.start()
+    
+    def _fallback_loop(self, callback: Callable[[str], None]) -> None:
+        """Fallback input loop using traditional input."""
+        while self.running:
+            try:
+                choice = Prompt.ask(
+                    "[bold cyan]Action[/bold cyan]",
+                    choices=list(self.valid_keys),
+                    default="a",
+                    show_choices=False
+                )
+                callback(choice)
+            except (KeyboardInterrupt, EOFError):
+                callback('q')  # Quit on interrupt
+                break
+    
+    def stop(self) -> None:
+        """Stop the keyboard listener."""
+        self.running = False
+        if self._listener_thread and self._listener_thread.is_alive():
+            self._listener_thread.join(timeout=1.0)
+
+
 class SimpleCommitTUI:
     """Simple, LazyGit-style TUI for commit message editing."""
     
@@ -176,7 +310,7 @@ class SimpleCommitTUI:
         self.git_wrapper = git_wrapper
         self.console = Console()
         self.running = True
-        self.editor = InPlaceEditor(message)
+        self.keyboard_handler = UnifiedKeyboardHandler({'a', 'c', 'q'})
     
     def _clear_terminal(self) -> None:
         """Clear the terminal screen."""
@@ -259,90 +393,6 @@ class SimpleCommitTUI:
         self.running = False
         sys.exit(1)
     
-    def _keyboard_listener(self) -> None:
-        """Listen for keyboard input in a separate thread."""
-        try:
-            import keyboard
-            
-            def on_key_press(event):
-                if not self.running:
-                    return
-                if event.name in ['a', 'c', 'q']:
-                    self._handle_key_press(event.name)
-            
-            try:
-                keyboard.on_press(on_key_press)
-                
-                while self.running:
-                    time.sleep(0.1)
-                    
-            except (PermissionError, OSError) as e:
-                self._alternative_keyboard_listener()
-                
-        except ImportError:
-            self._alternative_keyboard_listener()
-        except Exception as e:
-            self._alternative_keyboard_listener()
-    
-    def _fallback_input(self) -> None:
-        """Fallback to traditional input method."""
-        while self.running:
-            try:
-                choice = Prompt.ask(
-                    "[bold cyan]Action[/bold cyan]",
-                    choices=["a", "c", "q"],
-                    default="a",
-                    show_choices=False
-                )
-                self._handle_key_press(choice)
-            except KeyboardInterrupt:
-                self._handle_quit()
-            except EOFError:
-                self._handle_quit()
-    
-    def _get_key_press(self) -> Optional[str]:
-        """Get a single key press without requiring Enter."""
-        if 'pytest' in sys.modules or not sys.stdin.isatty():
-            return None
-            
-        try:
-            if os.name == 'nt':  # Windows
-                import msvcrt
-                key = msvcrt.getch().decode('utf-8').lower()
-                return key if key in ['a', 'c', 'q'] else None
-            else:  # Unix-like systems
-                try:
-                    import tty
-                    import termios
-                except ImportError:
-                    return None
-                
-                fd = sys.stdin.fileno()
-                old_settings = termios.tcgetattr(fd)
-                try:
-                    tty.setraw(sys.stdin.fileno())
-                    ch = sys.stdin.read(1).lower()
-                    return ch if ch in ['a', 'c', 'q'] else None
-                finally:
-                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        except Exception:
-            return None
-    
-    def _alternative_keyboard_listener(self) -> None:
-        """Alternative keyboard listener using platform-specific methods."""
-        if 'pytest' in sys.modules or not sys.stdin.isatty():
-            self._fallback_input()
-            return
-            
-        try:
-            while self.running:
-                key = self._get_key_press()
-                if key:
-                    self._handle_key_press(key)
-                time.sleep(0.01)
-        except Exception as e:
-            self._fallback_input()
-    
     def run(self) -> None:
         """Run the simple TUI with direct edit mode."""
         readiness = self.git_wrapper.check_commit_readiness()
@@ -362,14 +412,16 @@ class SimpleCommitTUI:
         self._clear_terminal()
         self.console.print(self._get_main_panel())
         
-        listener_thread = threading.Thread(target=self._keyboard_listener, daemon=True)
-        listener_thread.start()
+        # Start unified keyboard handler
+        self.keyboard_handler.start_listening(self._handle_key_press)
         
         try:
             while self.running:
                 time.sleep(0.1)
         except KeyboardInterrupt:
             self._handle_quit()
+        finally:
+            self.keyboard_handler.stop()
     
     def _handle_edit(self) -> None:
         """Handle edit action with in-place editing."""
