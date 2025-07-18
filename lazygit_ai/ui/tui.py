@@ -17,7 +17,6 @@ from rich.console import Console, Group
 from rich.text import Text
 from rich.panel import Panel
 from rich.prompt import Prompt
-from rich.columns import Columns
 
 from ..core.analyzer import GitAnalysis
 from ..utils.git import GitWrapper
@@ -58,7 +57,6 @@ class InPlaceEditor:
     
     def _get_char(self) -> str:
         """Get a single character from stdin."""
-        # Skip this method in test environments
         if 'pytest' in sys.modules or not sys.stdin.isatty():
             raise Exception("Not in interactive terminal")
             
@@ -186,10 +184,6 @@ class SimpleCommitTUI:
     
     def _get_main_panel(self) -> Panel:
         """Create the main panel that shows the edit interface directly."""
-        # Check commit readiness
-        readiness = self.git_wrapper.check_commit_readiness()
-        
-        # Create the edit panel with pre-filled commit message
         message_panel = Panel(
             f"[bold yellow]✎[/bold yellow] {self.message}",
             title="[bold yellow]✎ Edit commit message[/bold yellow]",
@@ -197,7 +191,6 @@ class SimpleCommitTUI:
             padding=(1, 2)
         )
         
-        # Git info
         info_lines = [
             f"[yellow]Branch:[/yellow] [white]{self.analysis.branch_name}[/white]",
             f"[yellow]Files:[/yellow] [white]{len(self.analysis.staged_files)}[/white]",
@@ -205,22 +198,16 @@ class SimpleCommitTUI:
             ""
         ]
         
-        # Add readiness status
-        if not readiness["ready"]:
-            info_lines.append(f"[red]{readiness['message']}[/red]")
-        elif readiness["unstaged_changes"]:
-            info_lines.append(f"[yellow]{readiness['message']}[/yellow]")
-        else:
-            info_lines.append(f"[green]{readiness['message']}[/green]")
+        readiness = self.git_wrapper.check_commit_readiness()
+        if readiness["unstaged_changes"]:
+            info_lines.append(f"[yellow]⚠️  You also have unstaged changes. Only staged changes will be committed.[/yellow]")
         
         info_lines.append("")
         
         info_group = Group(*(Text.from_markup(line) for line in info_lines))
         
-        # Actions - updated for direct edit mode
         actions_text = "[dim]Press Enter to finish editing, a to accept, c to copy, q to quit[/dim]"
         
-        # Compose all content as a Group
         group = Group(
             message_panel,
             info_group,
@@ -245,7 +232,6 @@ class SimpleCommitTUI:
             self._handle_copy()
         elif key == "q":
             self._handle_quit()
-        # Removed 'e' key handling since we start directly in edit mode
     
     def _handle_accept(self) -> None:
         """Handle accept action."""
@@ -284,23 +270,18 @@ class SimpleCommitTUI:
                 if event.name in ['a', 'c', 'q']:
                     self._handle_key_press(event.name)
             
-            # Try to start the keyboard listener
             try:
                 keyboard.on_press(on_key_press)
                 
-                # Keep the listener running
                 while self.running:
                     time.sleep(0.1)
                     
             except (PermissionError, OSError) as e:
-                # Handle permission errors gracefully - fall back silently
                 self._alternative_keyboard_listener()
                 
         except ImportError:
-            # Fallback to alternative method if keyboard library is not available
             self._alternative_keyboard_listener()
         except Exception as e:
-            # Fallback to alternative method on any error
             self._alternative_keyboard_listener()
     
     def _fallback_input(self) -> None:
@@ -321,7 +302,6 @@ class SimpleCommitTUI:
     
     def _get_key_press(self) -> Optional[str]:
         """Get a single key press without requiring Enter."""
-        # Skip this method in test environments
         if 'pytest' in sys.modules or not sys.stdin.isatty():
             return None
             
@@ -331,7 +311,6 @@ class SimpleCommitTUI:
                 key = msvcrt.getch().decode('utf-8').lower()
                 return key if key in ['a', 'c', 'q'] else None
             else:  # Unix-like systems
-                # Import tty and termios conditionally
                 try:
                     import tty
                     import termios
@@ -351,7 +330,6 @@ class SimpleCommitTUI:
     
     def _alternative_keyboard_listener(self) -> None:
         """Alternative keyboard listener using platform-specific methods."""
-        # Skip this method in test environments
         if 'pytest' in sys.modules or not sys.stdin.isatty():
             self._fallback_input()
             return
@@ -361,28 +339,32 @@ class SimpleCommitTUI:
                 key = self._get_key_press()
                 if key:
                     self._handle_key_press(key)
-                time.sleep(0.01)  # Small delay to prevent high CPU usage
+                time.sleep(0.01)
         except Exception as e:
-            # If alternative method fails, fall back to traditional input
             self._fallback_input()
     
     def run(self) -> None:
         """Run the simple TUI with direct edit mode."""
+        readiness = self.git_wrapper.check_commit_readiness()
+        
+        if not readiness["ready"]:
+            self._clear_terminal()
+            self.console.print(f"[bold red]{readiness['message']}[/bold red]")
+            self.console.print("\n[yellow]Please stage your files first, then run lazygit-ai again.[/yellow]")
+            self.running = False
+            sys.exit(1)
+        
         self._clear_terminal()
         self.console.print(self._get_main_panel())
         
-        # Start directly in edit mode
         self._handle_edit()
         
-        # After editing, show the updated interface and wait for final action
         self._clear_terminal()
         self.console.print(self._get_main_panel())
         
-        # Start keyboard listener in a separate thread
         listener_thread = threading.Thread(target=self._keyboard_listener, daemon=True)
         listener_thread.start()
         
-        # Keep main thread alive
         try:
             while self.running:
                 time.sleep(0.1)
@@ -391,72 +373,51 @@ class SimpleCommitTUI:
     
     def _handle_edit(self) -> None:
         """Handle edit action with in-place editing."""
-        # Check if we're in a test environment or if terminal doesn't support raw mode
         if not sys.stdin.isatty() or 'pytest' in sys.modules:
-            # Use fallback method for tests or non-interactive environments
             self._fallback_edit()
             return
             
         try:
-            # Calculate where the message text starts in the panel
-            # The message starts after "✎ " in the panel
-            message_start_col = 4  # "✎ " is 2 chars + 2 for padding
+            message_start_col = 4
+            panel_start_row = 3
+            panel_start_col = 4
             
-            # Get current cursor position and move to message area
-            # We need to calculate the actual position based on the panel layout
-            panel_start_row = 3  # Approximate start of the message panel
-            panel_start_col = 4  # Left padding of the panel
-            
-            # Position cursor at the start of the message text
-            cursor_row = panel_start_row + 1  # +1 for panel border
+            cursor_row = panel_start_row + 1
             cursor_col = panel_start_col + message_start_col
             
-            # Create new editor instance with current message
             editor = InPlaceEditor(self.message)
             
-            # Start in-place editing
             new_message = editor.edit(cursor_row, cursor_col)
             
-            # Update the message if something was entered
             if new_message.strip():
                 self.message = new_message.strip()
-                # Refresh the interface with the new message
                 self._clear_terminal()
                 self.console.print(self._get_main_panel())
                 self.console.print("[bold green]✅ Message updated![/bold green]")
             
         except Exception as e:
-            # Fallback to traditional editing if in-place editing fails
             self._fallback_edit()
     
     def _fallback_edit(self) -> None:
         """Fallback editing method."""
         try:
-            # Show a clean editing interface
             self.console.print(f"\n[bold cyan]✎ Editing commit message:[/bold cyan]")
             
-            # Use readline for better editing experience with pre-filled text
             import readline
             
-            # Set up readline to pre-fill the current message
             readline.set_startup_hook(lambda: readline.insert_text(self.message))
             
-            # Get input with a clean prompt
             new_message = input("[bold yellow]Message: [/bold yellow]")
             
-            # Clean up readline
             readline.set_startup_hook()
             
-            # Update the message if something was entered
             if new_message.strip():
                 self.message = new_message.strip()
-                # Refresh the interface with the new message
                 self._clear_terminal()
                 self.console.print(self._get_main_panel())
                 self.console.print("[bold green]✅ Message updated![/bold green]")
             
         except ImportError:
-            # Fallback if readline is not available
             self.console.print(f"\n[bold cyan]✎ Editing commit message:[/bold cyan]")
             new_message = Prompt.ask(
                 "[bold yellow]Message[/bold yellow]",

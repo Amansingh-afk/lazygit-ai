@@ -77,14 +77,15 @@ def commit(
             console.print("Please run this command from within a git repository.")
             raise typer.Exit(1)
         
-        # Check for staged changes
-        staged_files = git_wrapper.get_staged_files()
-        if not staged_files:
-            console.print("[yellow]⚠️  No files staged for commit[/yellow]")
-            console.print("\n[dim]Try staging some files first:[/dim]")
-            console.print("  [code]git add <files>[/code]")
-            console.print("  [code]git add .[/code] (stage all changes)")
+        # Check commit readiness using the new method
+        readiness = git_wrapper.check_commit_readiness()
+        if not readiness["ready"]:
+            console.print(f"[red]{readiness['message']}[/red]")
+            console.print("\n[yellow]Please stage your files first, then run lazygit-ai again.[/yellow]")
             raise typer.Exit(1)
+        
+        # Get staged files for analysis
+        staged_files = readiness["staged_files"]
         
         # Show analysis start
         display.show_analysis_start(staged_files)
