@@ -345,7 +345,6 @@ class LLMProvider:
             return False
         
         try:
-            # Create a simple test analysis
             from dataclasses import dataclass
             
             @dataclass

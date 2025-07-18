@@ -61,10 +61,19 @@ class GitWrapper:
             )
             
             staged_files = []
-            for line in result.stdout.strip().split("\n"):
-                if line and line[0] in "AMDR":  # Added, Modified, Deleted, Renamed
-                    file_path = line[3:]  # Remove status prefix
-                    staged_files.append(file_path)
+            for line in result.stdout.split("\n"):
+                if line and len(line) >= 2:
+                    # Check if file is staged: first char is A/M/D/R (not space)
+                    # Second char can be anything (unstaged status)
+                    if line[0] in "AMDR":
+                        # Handle different prefix lengths:
+                        # "M README.md" -> prefix is 2 chars ("M ")
+                        # "M  README.md" -> prefix is 3 chars ("M  ")
+                        if len(line) >= 3 and line[1] == " " and line[2] == " ":
+                            file_path = line[3:].strip()  # Remove 3-char prefix
+                        else:
+                            file_path = line[2:].strip()  # Remove 2-char prefix
+                        staged_files.append(file_path)
             
             return staged_files
         except subprocess.CalledProcessError:
@@ -128,10 +137,8 @@ class GitWrapper:
             # Documentation
             elif suffix in {".md", ".txt", ".rst", ".adoc", ".tex"}:
                 categories["docs"].append(file_path)
-            # Tests
             elif "test" in path.name.lower() or suffix in {".test.js", ".test.ts", ".spec.js", ".spec.ts", "_test.py", "test_"}:
                 categories["tests"].append(file_path)
-            # Configuration
             elif suffix in {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env"}:
                 categories["config"].append(file_path)
             # Assets
@@ -236,44 +243,24 @@ class GitWrapper:
     def commit(self, message: str) -> bool:
         """Create a commit with the given message."""
         try:
-            # First check if there are staged files
             staged_files = self.get_staged_files()
             if not staged_files:
-                print("❌ No staged files to commit. Please stage your changes first.")
-                print("   Use: git add .  or  git add <specific-files>")
                 return False
             
-            # Check if working directory is clean
-            if not self.is_clean_working_directory():
-                print("⚠️  Warning: You have unstaged changes. Only staged changes will be committed.")
-            
-            # Attempt to create the commit
             result = subprocess.run(
                 ["git", "commit", "-m", message],
                 capture_output=True,
                 text=True,
                 cwd=self.repo_path,
-                check=False,  # Don't raise exception, handle return code manually
+                check=False,
             )
             
             if result.returncode == 0:
-                print(f"✅ Commit created successfully: {message}")
                 return True
             else:
-                print(f"❌ Git commit failed with return code {result.returncode}")
-                if result.stderr:
-                    print(f"Error: {result.stderr.strip()}")
-                if result.stdout:
-                    # Check if the output looks like git status (which means no staged files)
-                    if "Changes not staged for commit:" in result.stdout or "no changes added to commit" in result.stdout:
-                        print("❌ No staged files to commit. Please stage your changes first.")
-                        print("   Use: git add .  or  git add <specific-files>")
-                    else:
-                        print(f"Output: {result.stdout.strip()}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Exception during commit: {e}")
             return False
     
     def get_branch_info(self) -> Dict[str, str]:
