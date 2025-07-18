@@ -236,14 +236,44 @@ class GitWrapper:
     def commit(self, message: str) -> bool:
         """Create a commit with the given message."""
         try:
-            subprocess.run(
+            # First check if there are staged files
+            staged_files = self.get_staged_files()
+            if not staged_files:
+                print("❌ No staged files to commit. Please stage your changes first.")
+                print("   Use: git add .  or  git add <specific-files>")
+                return False
+            
+            # Check if working directory is clean
+            if not self.is_clean_working_directory():
+                print("⚠️  Warning: You have unstaged changes. Only staged changes will be committed.")
+            
+            # Attempt to create the commit
+            result = subprocess.run(
                 ["git", "commit", "-m", message],
                 capture_output=True,
+                text=True,
                 cwd=self.repo_path,
-                check=True,
+                check=False,  # Don't raise exception, handle return code manually
             )
-            return True
-        except subprocess.CalledProcessError:
+            
+            if result.returncode == 0:
+                print(f"✅ Commit created successfully: {message}")
+                return True
+            else:
+                print(f"❌ Git commit failed with return code {result.returncode}")
+                if result.stderr:
+                    print(f"Error: {result.stderr.strip()}")
+                if result.stdout:
+                    # Check if the output looks like git status (which means no staged files)
+                    if "Changes not staged for commit:" in result.stdout or "no changes added to commit" in result.stdout:
+                        print("❌ No staged files to commit. Please stage your changes first.")
+                        print("   Use: git add .  or  git add <specific-files>")
+                    else:
+                        print(f"Output: {result.stdout.strip()}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Exception during commit: {e}")
             return False
     
     def get_branch_info(self) -> Dict[str, str]:
@@ -278,3 +308,27 @@ class GitWrapper:
                 "remote_url": "",
                 "has_remote": False,
             } 
+
+    def check_commit_readiness(self) -> Dict[str, any]:
+        """Check if the repository is ready for committing and provide guidance."""
+        staged_files = self.get_staged_files()
+        unstaged_changes = not self.is_clean_working_directory()
+        
+        status = {
+            "ready": len(staged_files) > 0,
+            "staged_files": staged_files,
+            "unstaged_changes": unstaged_changes,
+            "message": ""
+        }
+        
+        if not staged_files:
+            if unstaged_changes:
+                status["message"] = "❌ No staged files to commit. You have unstaged changes.\n   Use: git add .  or  git add <specific-files>"
+            else:
+                status["message"] = "❌ No staged files to commit.\n   Use: git add .  or  git add <specific-files>"
+        elif unstaged_changes:
+            status["message"] = "⚠️  Ready to commit staged files. You also have unstaged changes."
+        else:
+            status["message"] = "✅ Ready to commit staged files."
+            
+        return status 

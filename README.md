@@ -21,10 +21,17 @@ Transform your Git workflow with intelligent commit message generation. `lazygit
 - **Auto-installation**: One command to set up LazyGit shortcuts
 - **Beautiful UI**: Clean, professional terminal interface
 
+### ✏️ Advanced Editing Experience
+- **In-place editing**: Edit commit messages directly within the interface
+- **Direct key press**: Instant response without pressing Enter
+- **Pre-filled messages**: Start editing with AI-generated content
+- **Keyboard shortcuts**: Quick actions with single key presses
+
 ### 🔧 Developer Experience
 - **Zero configuration**: Works out of the box
 - **Extensible**: Easy to add custom rules and LLM providers
 - **Cross-platform**: Works on macOS, Linux, and Windows
+- **Fallback support**: Graceful degradation when advanced features unavailable
 
 ## 🚀 Quick Start
 
@@ -67,24 +74,31 @@ After running `lazygit-ai install-shortcut`, you can:
 
 ## 🎨 Demo
 
-### Beautiful Interface
+### Beautiful Interface with In-Place Editing
 ```
 ╭─────────────────────────────────────────────────────────────────────────────────── 🚀 lazygit-ai - Commit Message Editor ────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                                                                                                              │
-│  ╭─────────────────────────────────────────────────────────────────────────────────────── Suggested commit message ───────────────────────────────────────────────────────────────────────────────────────╮  │
+│  ╭─────────────────────────────────────────────────────────────────────────────────────── ✎ Edit commit message ───────────────────────────────────────────────────────────────────────────────────────╮  │
 │  │                                                                                                                                                                                                        │  │
-│  │  feat(cli): add TODO for error handling improvements                                                                                                                                                   │  │
+│  │  ✎ feat(cli): add in-place editor for commit messages                                                                                                                                                 │  │
 │  │                                                                                                                                                                                                        │  │
 │  ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯  │
-│  Branch: master                                                                                                                                                                                              │
-│  Files: 1                                                                                                                                                                                                    │
-│  Changes: 1 file (code)                                                                                                                                                                                      │
+│  Branch: feature/inplace-editor                                                                                                                                                                             │
+│  Files: 2                                                                                                                                                                                                   │
+│  Changes: 2 files (new feature)                                                                                                                                                                             │
 │                                                                                                                                                                                                              │
-│  a to accept, e to edit, c to copy, q to quit                                                                                                                                                               │
+│  Press Enter to finish editing, a to accept, c to copy, q to quit                                                                                                                                          │
 │                                                                                                                                                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-Action (e):
 ```
+
+### Key Features
+- **Direct edit mode**: Opens immediately in editing mode - no need to press 'e'
+- **Enter to finish**: Press Enter to complete editing and return to action menu
+- **Quick actions**: Press 'a' to accept, 'c' to copy, 'q' to quit after editing
+- **Pre-filled content**: Start with AI-generated commit messages
+- **Keyboard navigation**: Use arrow keys, Home, End, Backspace during editing
+- **Fallback support**: Works even when advanced terminal features unavailable
 
 ### Help Command
 ```
@@ -141,6 +155,23 @@ When rules produce generic results, the AI fallback:
 2. Sends to configured LLM (OpenAI, Claude, or local)
 3. Merges rule insights with AI suggestions
 4. Returns enhanced commit message
+
+### Advanced UX Implementation
+
+The in-place editor provides a seamless editing experience:
+
+1. **Direct Key Press Detection**: Uses the `keyboard` library for instant response
+2. **Fallback Mechanisms**: Gracefully degrades to traditional input when needed
+3. **Cursor Positioning**: ANSI escape codes for precise cursor control
+4. **Real-time Updates**: Live text editing with immediate visual feedback
+5. **Cross-platform Support**: Works on Windows, macOS, and Linux
+
+#### Technical Features
+- **Threaded Input**: Non-blocking key press detection
+- **Terminal Raw Mode**: Direct character input without line buffering
+- **ANSI Escape Sequences**: Precise cursor positioning and line clearing
+- **Error Handling**: Robust fallback to traditional input methods
+- **Test Compatibility**: Works seamlessly in automated testing environments
 
 ## ⚙️ Configuration
 
@@ -223,15 +254,17 @@ mypy lazygit_ai
 - **Terminal clearing**: Clean slate on every action
 
 ### Interactive Actions
-- **Accept**: Create commit with suggested message
-- **Edit**: Modify the commit message inline
-- **Copy**: Copy message to clipboard
-- **Quit**: Exit without committing
+- **Direct key press**: Press keys directly without Enter - instant response
+- **Accept**: Press `a` to create commit with suggested message
+- **Edit**: Press `e` to modify the commit message inline
+- **Copy**: Press `c` to copy message to clipboard
+- **Quit**: Press `q` to exit without committing
 
 ### Smart Defaults
-- **Edit mode default**: Press Enter to edit the message
-- **Keyboard shortcuts**: Simple a/e/c/q mappings
+- **Responsive interface**: No need to press Enter after actions
+- **Keyboard shortcuts**: Simple a/e/c/q mappings for quick access
 - **Context awareness**: Shows branch, files, and changes
+- **Fallback support**: Gracefully falls back to traditional input if needed
 
 ## 🤝 Contributing
 
