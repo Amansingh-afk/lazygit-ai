@@ -128,14 +128,13 @@ lazygit_ai/
 │   ├── rules.py        # Rule-based commit generation
 │   └── llm.py          # AI integration layer
 ├── ui/
-│   ├── tui.py          # Beautiful terminal UI
+│   ├── tui.py          # Beautiful terminal UI with in-place editing
 │   └── display.py      # Rich terminal output
 ├── utils/
 │   ├── git.py          # Git wrapper utilities
 │   ├── config.py       # Configuration management
 │   └── shortcuts.py    # LazyGit integration
-└── tests/
-    └── test_rules.py   # Test suite
+└── tests/              # Test suite
 ```
 
 ### Rule-Based Engine
@@ -229,8 +228,10 @@ pytest
 # Run with coverage
 pytest --cov=lazygit_ai
 
-# Run specific test file
-pytest tests/test_rules.py
+# Run specific test categories
+pytest tests/test_core/     # Core functionality tests
+pytest tests/test_ui/       # UI component tests
+pytest tests/test_utils/    # Utility function tests
 ```
 
 ### Code Quality
@@ -243,6 +244,9 @@ isort lazygit_ai tests
 # Lint code
 flake8 lazygit_ai tests
 mypy lazygit_ai
+
+# Run all quality checks
+pre-commit run --all-files
 ```
 
 ## 🎨 UI Features
@@ -265,6 +269,27 @@ mypy lazygit_ai
 - **Keyboard shortcuts**: Simple a/e/c/q mappings for quick access
 - **Context awareness**: Shows branch, files, and changes
 - **Fallback support**: Gracefully falls back to traditional input if needed
+
+## 🧹 Codebase Quality
+
+### Clean Architecture
+- **Minimal dependencies**: Only essential imports and libraries
+- **No debugging code**: Production-ready without debug prints or test artifacts
+- **Optimized imports**: Removed unused imports and redundant code
+- **Clean error handling**: Proper error management without verbose logging
+- **Streamlined UI**: Simplified interface code with essential functionality only
+
+### Performance Optimizations
+- **Efficient Git operations**: Optimized Git wrapper for faster analysis
+- **Smart caching**: Configurable caching for repeated operations
+- **Memory efficient**: Minimal memory footprint for large repositories
+- **Fast startup**: Quick initialization and response times
+
+### Code Standards
+- **Type hints**: Full type annotation coverage
+- **Docstrings**: Comprehensive documentation for all public APIs
+- **Error handling**: Robust exception handling with graceful fallbacks
+- **Cross-platform**: Works consistently across Windows, macOS, and Linux
 
 ## 🤝 Contributing
 
